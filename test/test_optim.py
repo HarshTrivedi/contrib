@@ -1,10 +1,12 @@
+import math
 import unittest
 import functools
 from copy import deepcopy
 import torch
 from torch.autograd import Variable
 from torch import sparse
-
+from common import TestCase, run_tests
+import torchcontrib
 
 def rosenbrock(tensor):
     x, y = tensor
@@ -22,9 +24,9 @@ def wrap_old_fn(old_fn, **config):
     return wrapper
 
 
-class TestOptim(unittest.TestCase):
+class TestOptim(TestCase):
 
-    def _test_rosenbrock(self, constructor, old_fn):
+    def _test_rosenbrock(self, constructor, old_fn=None):
         params_t = torch.Tensor([1.5, 1.5])
         state = {}
 
@@ -49,9 +51,10 @@ class TestOptim(unittest.TestCase):
 
         for i in range(2000):
             optimizer.step(eval)
-            old_fn(lambda _: (rosenbrock(params_t), drosenbrock(params_t)),
-                   params_t, state)
-            self.assertEqual(params.data, params_t)
+            if old_fn:
+                old_fn(lambda _: (rosenbrock(params_t), drosenbrock(params_t)),
+                       params_t, state)
+                self.assertEqual(params.data, params_t)
 
         self.assertLessEqual(params.data.dist(solution), initial_dist)
 
@@ -228,3 +231,10 @@ class TestOptim(unittest.TestCase):
 
     def _build_params_dict_single(self, weight, bias, **kwargs):
         return [dict(params=bias, **kwargs)]
+
+    def test_cocob_backprop(self):
+        self._test_basic_cases(lambda weight, bias: torchcontrib.optim.CocobBackprop([weight, bias]))
+        self._test_rosenbrock(lambda params: torchcontrib.optim.CocobBackprop(params))
+
+if __name__ == '__main__':
+    unittest.main()
